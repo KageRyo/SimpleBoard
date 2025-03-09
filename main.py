@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from src.schemas import CreateMessageSchema, MessageSchema
 
 app = FastAPI()
 
