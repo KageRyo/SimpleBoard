@@ -69,6 +69,24 @@ async def create_message(body: CreateMessageSchema):
     return mew_message
 
 
+# 刪除留言
+@app.delete(
+    "/message/{message_id}",
+)
+def delete_message(message_id: int):
+    # 1. 取得全部的留言
+    messages = load_message()
+    # 2. 找到對應的留言(依照 message_id)
+    for index, message in enumerate(messages):
+        if message["id"] == message_id:
+            # 3. 刪除留言
+            del messages[index]
+            # 4. 儲存留言
+            save_message(messages)
+            # 5. 回傳成功訊息
+            return HTTPException(status_code=204, detail="刪除成功")
+
+
 # 測試程式碼
 @app.get("/")
 async def root():
