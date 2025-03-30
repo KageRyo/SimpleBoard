@@ -18,6 +18,34 @@ def save_message(message):
     df.to_json("message.json", orient="records")
 
 
+# 取得全部的留言
+@app.get(
+    "/messages",
+    response_model=list[MessageSchema]
+)
+def get_all_messages():
+    # 1. 讀取現有的留言(get or not)
+    messages = load_message()
+    # 2. 回傳留言
+    return messages
+
+
+# 取得單一的留言
+@app.get(
+    "/message/{message_id}",
+    response_model=MessageSchema
+)
+def get_message(message_id: int):
+    # 1. 先取得全部的留言
+    messages = load_message()
+    # 2. 找到對應的留言(依照 message_id)
+    for index in messages:
+        if index["id"] == message_id:
+            return index
+    # 3. 如果沒有找到，回傳 404 錯誤
+    raise HTTPException(status_code=404, detail="找不到訊息")
+
+
 # 新增留言
 @app.post(
     "/message",
