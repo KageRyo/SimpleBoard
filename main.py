@@ -1,6 +1,6 @@
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from src.schemas import CreateMessageSchema, MessageSchema
+from src.schemas import CreateMessageSchema, UpdateMessageSchema, MessageSchema
 
 app = FastAPI()
 
@@ -67,6 +67,29 @@ async def create_message(body: CreateMessageSchema):
     save_message(messages)
     # 5. 回傳新增的留言
     return mew_message
+
+
+# 更新留言
+@app.patch(
+    "/message/{message_id}",
+    response_model=MessageSchema
+)
+def update_message(message_id: int, body: UpdateMessageSchema):
+    # 1. 取得全部的留言
+    messages = load_message()
+    # 2. 找到對應的留言(依照 message_id)
+    for index, message in enumerate(messages):
+        if message["id"] == message_id:
+            if body.username:
+                messages[index]["username"] = body.username
+            if body.message:
+                messages[index]["message"] = body.message
+            # 3. 儲存留言
+            save_message(messages)
+            # 4. 回傳更新的留言
+            return messages[index]
+    # 5. 如果沒有找到，回傳 404 錯誤
+    raise HTTPException(status_code=404, detail="找不到訊息")
 
 
 # 刪除留言
