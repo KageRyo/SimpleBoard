@@ -12,12 +12,13 @@ def load_message():
         return df.to_dict(orient="records")
     except FileNotFoundError:
         return []
-
+    
+    
 def save_message(message):
     df = pd.DataFrame(message)
     df.to_json("message.json", orient="records")
-
-
+    
+    
 # 取得全部的留言
 @app.get(
     "/messages",
@@ -108,24 +109,3 @@ def delete_message(message_id: int):
             save_message(messages)
             # 5. 回傳成功訊息
             return HTTPException(status_code=204, detail="刪除成功")
-
-
-# 測試程式碼
-@app.get("/")
-async def root():
-    return {
-        "message": "Hello FastAPI!"
-    }
-    
-@app.get("/test/{username}")
-async def username_test(username):
-    return {
-        "message": f"Hello {username}!"
-    }
-    
-@app.post("/test/message")
-async def message_test(username, message):
-    return {
-        "message": 
-            f"Hello {username}! Your message is {message}"
-    }
