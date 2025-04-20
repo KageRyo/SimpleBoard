@@ -1,2 +1,9 @@
+# api
 fastapi
 uvicorn
+
+# formation
+pydantic
+# data processing and storage
+pandas
+sqlalchemy
