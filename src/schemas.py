@@ -17,3 +17,6 @@ class MessageSchema(BaseModel):
     id: int         # id 是整數，所以我們要求格式是 int   
     username: str
     message: str
+    
+    class Config:   # 這個設定是讓 Pydantic 可以從 ORM 的物件轉換成 Pydantic 的物件
+        orm_mode = True

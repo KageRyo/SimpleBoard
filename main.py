@@ -1,8 +1,23 @@
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from sqlalchemy.orm import Session
 from src.schemas import CreateMessageSchema, UpdateMessageSchema, MessageSchema
+from src.database import Base, engine, SessionLocal
 
 app = FastAPI()
+
+
+# 創建已經定義的資料表
+Base.metadata.create_all(bind=engine)
+
+
+# 取得資料庫的 Session 會話
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # JSON 資料存儲
