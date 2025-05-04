@@ -1,31 +1,35 @@
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Response
+from sqlalchemy.orm import Session
 from src.schemas import CreateMessageSchema, UpdateMessageSchema, MessageSchema
+from src.database import Base, engine, SessionLocal
+from src.models import Message
+from typing import List
 
 app = FastAPI()
 
 
-# JSON 資料存儲
-def load_message():
+# 創建已經定義的資料表
+Base.metadata.create_all(bind=engine)
+
+
+# 取得資料庫的 Session 會話
+def get_db():
+    db = SessionLocal()
     try:
-        df = pd.read_json("message.json")
-        return df.to_dict(orient="records")
-    except FileNotFoundError:
-        return []
-
-def save_message(message):
-    df = pd.DataFrame(message)
-    df.to_json("message.json", orient="records")
-
-
+        yield db
+    finally:
+        db.close()
+    
+    
 # 取得全部的留言
 @app.get(
     "/messages",
     response_model=list[MessageSchema]
 )
-def get_all_messages():
+def get_all_messages(db: Session = Depends(get_db)):
     # 1. 讀取現有的留言(get or not)
-    messages = load_message()
+    messages = db.query(Message).all()
     # 2. 回傳留言
     return messages
 
@@ -35,15 +39,14 @@ def get_all_messages():
     "/message/{message_id}",
     response_model=MessageSchema
 )
-def get_message(message_id: int):
-    # 1. 先取得全部的留言
-    messages = load_message()
-    # 2. 找到對應的留言(依照 message_id)
-    for index in messages:
-        if index["id"] == message_id:
-            return index
-    # 3. 如果沒有找到，回傳 404 錯誤
-    raise HTTPException(status_code=404, detail="找不到訊息")
+def get_message(message_id: int, db: Session = Depends(get_db)):
+    # 1. 讀取現有的留言
+    message = db.query(Message).filter(Message.id == message_id).first()
+    # 2. 如果沒有找到，回傳 404 錯誤
+    if not message:
+        raise HTTPException(status_code=404, detail="找不到訊息")
+    # 3. 回傳留言
+    return message
 
 
 # 新增留言
@@ -51,22 +54,18 @@ def get_message(message_id: int):
     "/message",
     response_model=MessageSchema
 )
-async def create_message(body: CreateMessageSchema):
-    # 1. 讀取現有的留言(get or not)
-    messages = load_message()
-    # 2. 處理 ID
-    new_id = max([message["id"] for message in messages], default=0) + 1
-    # 3. 新增留言
-    mew_message = MessageSchema(
-        id = new_id,
-        username = body.username,
-        message = body.message
-    ).dict()
-    messages.append(mew_message)
-    # 4. 儲存留言
-    save_message(messages)
-    # 5. 回傳新增的留言
-    return mew_message
+async def create_message(body: CreateMessageSchema, db: Session = Depends(get_db)):
+    # 1. 讀取輸入的資料
+    new_message = Message(
+        username=body.username,
+        message=body.message
+    )
+    # 2. 將資料存入資料庫
+    db.add(new_message)
+    db.commit()
+    db.refresh(new_message)
+    # 3. 回傳新增的留言
+    return new_message
 
 
 # 更新留言
@@ -74,58 +73,36 @@ async def create_message(body: CreateMessageSchema):
     "/message/{message_id}",
     response_model=MessageSchema
 )
-def update_message(message_id: int, body: UpdateMessageSchema):
-    # 1. 取得全部的留言
-    messages = load_message()
-    # 2. 找到對應的留言(依照 message_id)
-    for index, message in enumerate(messages):
-        if message["id"] == message_id:
-            if body.username:
-                messages[index]["username"] = body.username
-            if body.message:
-                messages[index]["message"] = body.message
-            # 3. 儲存留言
-            save_message(messages)
-            # 4. 回傳更新的留言
-            return messages[index]
-    # 5. 如果沒有找到，回傳 404 錯誤
-    raise HTTPException(status_code=404, detail="找不到訊息")
+def update_message(message_id: int, body: UpdateMessageSchema, db: Session = Depends(get_db)):
+    # 1. 拿出要更新的留言
+    message = db.query(Message).filter(Message.id == message_id).first()
+    # 2. 如果沒有找到，回傳 404 錯誤
+    if not message:
+        raise HTTPException(status_code=404, detail="找不到訊息")
+    # 3. 更新留言的內容
+    if body.username:
+        message.username = body.username
+    if body.message:
+        message.message = body.message
+    # 4. 儲存留言
+    db.commit()
+    db.refresh(message)
+    # 5. 回傳更新的留言
+    return message
 
 
 # 刪除留言
 @app.delete(
     "/message/{message_id}",
 )
-def delete_message(message_id: int):
-    # 1. 取得全部的留言
-    messages = load_message()
-    # 2. 找到對應的留言(依照 message_id)
-    for index, message in enumerate(messages):
-        if message["id"] == message_id:
-            # 3. 刪除留言
-            del messages[index]
-            # 4. 儲存留言
-            save_message(messages)
-            # 5. 回傳成功訊息
-            return HTTPException(status_code=204, detail="刪除成功")
-
-
-# 測試程式碼
-@app.get("/")
-async def root():
-    return {
-        "message": "Hello FastAPI!"
-    }
-    
-@app.get("/test/{username}")
-async def username_test(username):
-    return {
-        "message": f"Hello {username}!"
-    }
-    
-@app.post("/test/message")
-async def message_test(username, message):
-    return {
-        "message": 
-            f"Hello {username}! Your message is {message}"
-    }
+def delete_message(message_id: int, db: Session = Depends(get_db)):
+    # 1. 找出要刪除的留言
+    message = db.query(Message).filter(Message.id == message_id).first()
+    # 2. 如果沒有找到，回傳 404 錯誤
+    if not message:
+        raise HTTPException(status_code=404, detail="找不到訊息")
+    # 3. 刪除留言
+    db.delete(message)
+    db.commit()
+    # 4. 回傳刪除成功的訊息
+    return Response(status_code=204)
