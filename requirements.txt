@@ -8,3 +8,7 @@ pydantic
 # data processing and storage
 pandas
 sqlalchemy
+
+# user account management
+pyjwt
+passlib[bcrypt]

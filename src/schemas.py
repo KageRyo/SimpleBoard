@@ -2,13 +2,27 @@ from pydantic import BaseModel
 from typing import Optional
 
 
+"""
+Schemas of the user
+"""
+class CreateLoginSchema(BaseModel):
+    username: str   # 使用者名稱
+    password: str   # 使用者密碼
+
+    
+class JwtTokenSchema(BaseModel):
+    access: str   # Access Token
+    refresh: str  # Refresh Token
+
+
+"""
+Schemas of the message
+"""
 class CreateMessageSchema(BaseModel):
-    username: str   # 留言的人
     message: str    # 留言訊息
     
     
 class UpdateMessageSchema(BaseModel):
-    username: Optional[str] = None   # 留言的人
     message: Optional[str] = None    # 留言訊息
     
     
