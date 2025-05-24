@@ -12,3 +12,6 @@ sqlalchemy
 # user account management
 pyjwt
 passlib[bcrypt]
+
+# testing
+pytest
