@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>SimpleBoard 前端</title>
+</head>
+<body>
+    <h1>SimpleBoard 留言板</h1>
+    <div id="login">
+        <input id="username" placeholder="帳號">
+        <input id="password" type="password" placeholder="密碼">
+        <button id="loginBtn">登入</button>
+    </div>
+    <div id="board" style="display:none;">
+        <h2>留言列表</h2>
+        <ul id="messages"></ul>
+        <input id="newMessage" placeholder="輸入留言">
+        <button id="sendBtn">送出留言</button>
+    </div>
+    <script src="main.js"></script>
+    <script>
+        let token = "";
+        document.getElementById("loginBtn").onclick = async () => {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            try {
+                const data = await login(username, password);
+                token = data.access;
+                document.getElementById("login").style.display = "none";
+                document.getElementById("board").style.display = "";
+                loadMessages();
+            } catch {
+                alert("登入失敗");
+            }
+        };
+        async function loadMessages() {
+            try {
+                const msgs = await getMessages(token);
+                const ul = document.getElementById("messages");
+                ul.innerHTML = "";
+                msgs.forEach(msg => {
+                    const li = document.createElement("li");
+                    li.textContent = `[${msg.username}] ${msg.message}`;
+                    ul.appendChild(li);
+                });
+            } catch {
+                alert("取得留言失敗");
+            }
+        }
+        document.getElementById("sendBtn").onclick = async () => {
+            const msg = document.getElementById("newMessage").value;
+            try {
+                await postMessage(token, msg);
+                document.getElementById("newMessage").value = "";
+                loadMessages();
+            } catch {
+                alert("留言失敗");
+            }
+        };
+    </script>
+</body>
+</html>

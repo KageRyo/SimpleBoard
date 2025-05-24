@@ -1,3 +1,4 @@
+import tests.env  # 確保先載入 localtest.env
 import pytest
 from .fixtures import client, user_token, auth_header
 import os
@@ -5,8 +6,9 @@ from app.schemas import CreateMessageSchema, UpdateMessageSchema, MessageSchema
 
 def test_create_message(client, user_token):
     # GIVEN 已登入的使用者
+    data = CreateMessageSchema(message="hello world").dict()
     # WHEN 發送新增留言請求
-    resp = client.post("/message", json={"message": "hello world"}, headers=auth_header(user_token))
+    resp = client.post("/message", json=data, headers=auth_header(user_token))
     # THEN 應成功新增留言
     assert resp.status_code == 200
     assert resp.json()["message"] == "hello world"
@@ -23,7 +25,8 @@ def test_get_all_messages(client, user_token):
 
 def test_get_message(client, user_token):
     # GIVEN 已登入的使用者，且有一則留言
-    resp = client.post("/message", json={"message": "get single"}, headers=auth_header(user_token))
+    data = CreateMessageSchema(message="get single").dict()
+    resp = client.post("/message", json=data, headers=auth_header(user_token))
     msg_id = resp.json()["id"]
     # WHEN 查詢該留言
     resp = client.get(f"/message/{msg_id}", headers=auth_header(user_token))
@@ -33,17 +36,20 @@ def test_get_message(client, user_token):
 
 def test_update_message(client, user_token):
     # GIVEN 已登入的使用者，且有一則留言
-    resp = client.post("/message", json={"message": "to update"}, headers=auth_header(user_token))
+    data = CreateMessageSchema(message="to update").dict()
+    resp = client.post("/message", json=data, headers=auth_header(user_token))
     msg_id = resp.json()["id"]
+    update_data = {"message": "updated"}
     # WHEN 更新該留言
-    resp = client.patch(f"/message/{msg_id}", json={"message": "updated"}, headers=auth_header(user_token))
+    resp = client.patch(f"/message/{msg_id}", json=update_data, headers=auth_header(user_token))
     # THEN 應成功更新留言內容
     assert resp.status_code == 200
     assert resp.json()["message"] == "updated"
 
 def test_delete_message(client, user_token):
     # GIVEN 已登入的使用者，且有一則留言
-    resp = client.post("/message", json={"message": "to delete"}, headers=auth_header(user_token))
+    data = CreateMessageSchema(message="to delete").dict()
+    resp = client.post("/message", json=data, headers=auth_header(user_token))
     msg_id = resp.json()["id"]
     # WHEN 刪除該留言
     resp = client.delete(f"/message/{msg_id}", headers=auth_header(user_token))
@@ -58,7 +64,8 @@ def test_edit_other_user_message(client, user_token):
     resp = client.post("/login", json={"username": other_user, "password": other_pass})
     other_token = resp.json()["access"]
     # 且 msguser 新增一則留言
-    resp = client.post("/message", json={"message": "not yours"}, headers=auth_header(user_token))
+    data = CreateMessageSchema(message="not yours").dict()
+    resp = client.post("/message", json=data, headers=auth_header(user_token))
     msg_id = resp.json()["id"]
     # WHEN 其他使用者嘗試編輯該留言
     resp = client.patch(f"/message/{msg_id}", json={"message": "hack"}, headers=auth_header(other_token))
@@ -73,7 +80,8 @@ def test_delete_other_user_message(client, user_token):
     resp = client.post("/login", json={"username": other_user, "password": other_pass})
     other_token = resp.json()["access"]
     # 且 msguser 新增一則留言
-    resp = client.post("/message", json={"message": "not yours del"}, headers=auth_header(user_token))
+    data = CreateMessageSchema(message="not yours del").dict()
+    resp = client.post("/message", json=data, headers=auth_header(user_token))
     msg_id = resp.json()["id"]
     # WHEN 其他使用者嘗試刪除該留言
     resp = client.delete(f"/message/{msg_id}", headers=auth_header(other_token))
