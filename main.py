@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
 from fastapi import FastAPI, Depends, HTTPException, Response
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import APIKeyHeader  
 from sqlalchemy.orm import Session
-from src.schemas import CreateMessageSchema, UpdateMessageSchema, MessageSchema
+from src.schemas import CreateMessageSchema, UpdateMessageSchema, MessageSchema, CreateLoginSchema, JwtTokenSchema, UserSchema
 from src.database import Base, engine, SessionLocal
 from src.models import User, Message
 from typing import List, Optional
@@ -27,7 +27,7 @@ ALGORITHM = "HS256"  # JWT 的加密演算法
 ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Access Token 的有效時間（分鐘）
 REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # Refresh Token 的有效時間（分鐘）（7 天）
 # OAuth2 的 Bearer Token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+oauth2_scheme = APIKeyHeader(name="Authorization")  
 
 # 取得資料庫的 Session 會話
 def get_db():
@@ -71,7 +71,9 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         detail="無效的 Token",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    # 檢查 Token 是否有效
+    # 修正：自動去除 Bearer 前綴
+    if token.startswith("Bearer "):
+        token = token[7:]
     try:
         payload = decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -79,31 +81,84 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             raise credentials_exception
     except PyJWTError:
         raise credentials_exception
-    # 檢查使用者是否存在
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
     return user
 
    
-# 取得全部的留言
+# 註冊 API
+@app.post("/register", response_model=UserSchema)
+def register(body: CreateLoginSchema, db: Session = Depends(get_db)):
+    # 檢查使用者是否已存在
+    user = db.query(User).filter(User.username == body.username).first()
+    if user:
+        raise HTTPException(status_code=400, detail="使用者已存在")
+    # 建立新使用者
+    hashed_pw = hash_password(body.password)
+    new_user = User(username=body.username, password=hashed_pw)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+# 登入 API
+@app.post("/login", response_model=JwtTokenSchema)
+def login(body: CreateLoginSchema, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == body.username).first()
+    if not user or not verify_password(body.password, user.password):
+        raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
+    access_token = create_access_token({"sub": user.username})
+    refresh_token = create_refresh_token({"sub": user.username})
+    return {"access": access_token, "refresh": refresh_token}
+
+# refresh token API
+@app.post("/refresh", response_model=JwtTokenSchema)
+def refresh_token(refresh: str, db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="無效的 Refresh Token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = decode(refresh, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except PyJWTError:
+        raise credentials_exception
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise credentials_exception
+    access_token = create_access_token({"sub": user.username})
+    refresh_token = create_refresh_token({"sub": user.username})
+    return {"access": access_token, "refresh": refresh_token}
+
+# 取得全部的留言（需登入）
 @app.get(
     "/messages",
     response_model=list[MessageSchema]
 )
-def get_all_messages(db: Session = Depends(get_db)):
+def get_all_messages(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     # 1. 讀取現有的留言(get or not)
     messages = db.query(Message).all()
     # 2. 回傳留言
     return messages
 
 
-# 取得單一的留言
+# 取得單一的留言（需登入）
 @app.get(
     "/message/{message_id}",
     response_model=MessageSchema
 )
-def get_message(message_id: int, db: Session = Depends(get_db)):
+def get_message(
+    message_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     # 1. 讀取現有的留言
     message = db.query(Message).filter(Message.id == message_id).first()
     # 2. 如果沒有找到，回傳 404 錯誤
@@ -113,15 +168,19 @@ def get_message(message_id: int, db: Session = Depends(get_db)):
     return message
 
 
-# 新增留言
+# 新增留言（需登入，username自動帶入）
 @app.post(
     "/message",
     response_model=MessageSchema
 )
-async def create_message(body: CreateMessageSchema, db: Session = Depends(get_db)):
+async def create_message(
+    body: CreateMessageSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     # 1. 讀取輸入的資料
     new_message = Message(
-        username=body.username,
+        username=current_user.username,
         message=body.message
     )
     # 2. 將資料存入資料庫
@@ -132,21 +191,26 @@ async def create_message(body: CreateMessageSchema, db: Session = Depends(get_db
     return new_message
 
 
-# 更新留言
+# 更新留言（需登入，只能改自己的留言）
 @app.patch(
     "/message/{message_id}",
     response_model=MessageSchema
 )
-def update_message(message_id: int, body: UpdateMessageSchema, db: Session = Depends(get_db)):
+def update_message(
+    message_id: int,
+    body: UpdateMessageSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     # 1. 拿出要更新的留言
     message = db.query(Message).filter(Message.id == message_id).first()
     # 2. 如果沒有找到，回傳 404 錯誤
     if not message:
         raise HTTPException(status_code=404, detail="找不到訊息")
+    if message.username != current_user.username:
+        raise HTTPException(status_code=403, detail="只能編輯自己的留言")
     # 3. 更新留言的內容
-    if body.username:
-        message.username = body.username
-    if body.message:
+    if body.message is not None:
         message.message = body.message
     # 4. 儲存留言
     db.commit()
@@ -155,16 +219,22 @@ def update_message(message_id: int, body: UpdateMessageSchema, db: Session = Dep
     return message
 
 
-# 刪除留言
+# 刪除留言（需登入，只能刪自己的留言）
 @app.delete(
     "/message/{message_id}",
 )
-def delete_message(message_id: int, db: Session = Depends(get_db)):
+def delete_message(
+    message_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     # 1. 找出要刪除的留言
     message = db.query(Message).filter(Message.id == message_id).first()
     # 2. 如果沒有找到，回傳 404 錯誤
     if not message:
         raise HTTPException(status_code=404, detail="找不到訊息")
+    if message.username != current_user.username:
+        raise HTTPException(status_code=403, detail="只能刪除自己的留言")
     # 3. 刪除留言
     db.delete(message)
     db.commit()
