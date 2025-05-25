@@ -13,21 +13,17 @@ from app.schemas import CreateLoginSchema, JwtTokenSchema, UserSchema
 from passlib.context import CryptContext
 from fastapi.security import APIKeyHeader
 
+from app.api.api_utils import get_current_user, get_db
+
 router = APIRouter()
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = get_env("APP_SECRET_KEY", secrets.token_urlsafe(32))
-ALGORITHM = get_env("APP_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(get_env("APP_ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 REFRESH_TOKEN_EXPIRE_MINUTES = int(get_env("APP_REFRESH_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7))
 
-oauth2_scheme = APIKeyHeader(name="Authorization")
+SECRET_KEY = get_env("APP_SECRET_KEY", secrets.token_urlsafe(32))
+ALGORITHM = get_env("APP_ALGORITHM", "HS256")
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+oauth2_scheme = APIKeyHeader(name="Authorization")
 
 def hash_password(password: str) -> str:
     return password_context.hash(password)
@@ -53,27 +49,6 @@ def create_refresh_token(data: dict) -> str:
     to_encode.update({"exp": expire})
     encoded_jwt = encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    # Parse JWT token and return current user, raise if invalid
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Invalid token",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    if token.startswith("Bearer "):
-        token = token[7:]
-    try:
-        payload = decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except PyJWTError:
-        raise credentials_exception
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
-        raise credentials_exception
-    return user
 
 @router.post("/register", response_model=UserSchema)
 def register(body: CreateLoginSchema, db: Session = Depends(get_db)):
