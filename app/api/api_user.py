@@ -1,10 +1,9 @@
 import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
-from typing import Optional
 from jwt import encode, decode, PyJWTError
 from datetime import datetime, timedelta
+from typing import Optional
 
 from app.env import get_env
 from app.database import SessionLocal
