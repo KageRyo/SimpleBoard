@@ -34,7 +34,7 @@ class UpdateMessageSchema(BaseModel):
 class MessageSchema(BaseModel):
     # id 只在 GET 時使用，不加在 CreateMessageSchema 是因為這不是要讓使用者自己設定的欄位
     id: int         # id 是整數，所以我們要求格式是 int   
-    username: str
+    username: Optional[str]  # 允許為 None
     message: str
     
     class Config:   # 這個設定是讓 Pydantic 可以從 ORM 的物件轉換成 Pydantic 的物件
