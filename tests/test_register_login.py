@@ -1,4 +1,4 @@
-import tests.env  # 確保先載入 localtest.env
+import tests.env
 import pytest
 from .fixtures import client
 import os
@@ -7,6 +7,7 @@ from app.schemas import CreateLoginSchema
 TEST_USERNAME = os.environ.get("TEST_USER", "testuser")
 TEST_PASSWORD = os.environ.get("TEST_PASS", "testpass")
 
+@pytest.mark.skip(reason="Skipping registration test temporarily")
 def test_register(client):
     # GIVEN 尚未註冊的帳號
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()

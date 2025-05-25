@@ -9,13 +9,14 @@ import secrets
 from jwt import encode, decode, PyJWTError
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
+from app.env import get_env
 
 router = APIRouter()
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = secrets.token_urlsafe(32)
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
+SECRET_KEY = get_env("APP_SECRET_KEY", secrets.token_urlsafe(32))
+ALGORITHM = get_env("APP_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(get_env("APP_ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+REFRESH_TOKEN_EXPIRE_MINUTES = int(get_env("APP_REFRESH_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7))
 
 def get_db():
     db = SessionLocal()
