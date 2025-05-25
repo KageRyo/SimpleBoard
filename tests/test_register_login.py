@@ -8,70 +8,70 @@ TEST_USERNAME = os.environ.get("TEST_USER", "testuser")
 TEST_PASSWORD = os.environ.get("TEST_PASS", "testpass")
 
 def delete_test_user(client):
-    # 登入取得 access token
+    # When: Login to get access token
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
     resp = client.post("/login", json=payload)
     if resp.status_code != 200:
         return
     access_token = resp.json()["access"]
-    # 刪除帳號
+    # When: Delete the account
     client.delete("/delete", headers={"Authorization": f"Bearer {access_token}"})
 
 def test_register(client):
-    # 測試前先刪除帳號，確保乾淨
+    # Given: Ensure account is deleted before test
     delete_test_user(client)
-    # GIVEN 尚未註冊的帳號
+    # Given: An unregistered account
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
-    # WHEN 註冊新帳號
+    # When: Register a new account
     resp = client.post("/register", json=payload)
-    # THEN 應註冊成功
+    # Then: Should register successfully
     assert resp.status_code == 200
     assert resp.json()["username"] == TEST_USERNAME
-    # GIVEN 已存在的帳號
+    # Given: The account already exists
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
-    # WHEN 再次註冊相同帳號
+    # When: Register the same account again
     resp = client.post("/register", json=payload)
-    # THEN 應回傳 400
+    # Then: Should return 400
     assert resp.status_code == 400
-    # 測試後刪除帳號
+    # Given: Clean up after test
     delete_test_user(client)
 
 def test_login_success(client):
-    # 確保帳號存在
+    # Given: Ensure account exists
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
     client.post("/register", json=payload)
-    # WHEN 正確登入
+    # When: Login with correct credentials
     resp = client.post("/login", json=payload)
-    # THEN 應取得 access 與 refresh token
+    # Then: Should get access and refresh token
     assert resp.status_code == 200
     data = resp.json()
     assert "access" in data and "refresh" in data
 
 def test_login_fail(client):
-    # GIVEN 已註冊的帳號
+    # Given: Registered account
     payload = CreateLoginSchema(username=TEST_USERNAME, password="wrongpass").dict()
-    # WHEN 密碼錯誤登入
+    # When: Login with wrong password
     resp = client.post("/login", json=payload)
-    # THEN 應回傳 401
+    # Then: Should return 401
     assert resp.status_code == 401
 
 def test_refresh_token(client):
-    # 確保帳號存在
+    # Given: Ensure account exists and login to get refresh token
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
     client.post("/register", json=payload)
     resp = client.post("/login", json=payload)
     assert resp.status_code == 200
     refresh_token = resp.json()["refresh"]
-    # WHEN 使用 refresh token 取得新 token
+    # When: Use refresh token to get new tokens
     resp = client.post("/refresh", params={"refresh": refresh_token})
-    # THEN 應取得新的 access 與 refresh token
+    # Then: Should get new access and refresh token
     assert resp.status_code == 200
     data = resp.json()
     assert "access" in data and "refresh" in data
 
 def test_refresh_token_invalid(client):
-    # GIVEN 無效的 refresh token
-    # WHEN 嘗試 refresh
+    # Given: Invalid refresh token
+    # When: Try to refresh
     resp = client.post("/refresh", params={"refresh": "invalidtoken"})
-    # THEN 應回傳 401
+    # Then: Should return 401
     assert resp.status_code == 401

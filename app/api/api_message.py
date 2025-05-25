@@ -19,6 +19,7 @@ def get_db():
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    # Parse JWT token and return current user, raise if invalid
     credentials_exception = HTTPException(
         status_code=401,
         detail="無效的 Token",
@@ -42,6 +43,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 def get_all_messages(
     db: Session = Depends(get_db)
 ):
+    # Get all messages with valid username
     messages = db.query(Message).filter(Message.username != None).all()
     return messages
 
@@ -61,6 +63,7 @@ async def create_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Create a new message for current user
     new_message = Message(
         username=current_user.username,
         message=body.message
@@ -77,6 +80,7 @@ def update_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Only allow user to update their own message
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:
         raise HTTPException(status_code=404, detail="找不到訊息")
@@ -94,6 +98,7 @@ def delete_message(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Only allow user to delete their own message
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:
         raise HTTPException(status_code=404, detail="找不到訊息")
