@@ -1,6 +1,8 @@
+from jwt import decode, PyJWTError
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
+from app.api.api_user import SECRET_KEY, ALGORITHM
 from app.schemas import CreateMessageSchema, UpdateMessageSchema, MessageSchema
 from app.database import SessionLocal
 from app.models import User, Message
@@ -15,9 +17,6 @@ def get_db():
     finally:
         db.close()
 
-# 複用 user 驗證
-from app.api.api_user import SECRET_KEY, ALGORITHM
-from jwt import decode, PyJWTError
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
@@ -41,8 +40,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 @router.get("/messages", response_model=list[MessageSchema])
 def get_all_messages(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     messages = db.query(Message).all()
     return messages
@@ -50,8 +48,7 @@ def get_all_messages(
 @router.get("/message/{message_id}", response_model=MessageSchema)
 def get_message(
     message_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     message = db.query(Message).filter(Message.id == message_id).first()
     if not message:

@@ -1,15 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import APIKeyHeader
-from sqlalchemy.orm import Session
-from app.schemas import CreateLoginSchema, JwtTokenSchema, UserSchema
-from app.database import SessionLocal
-from app.models import User
-from typing import Optional
 import secrets
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from typing import Optional
 from jwt import encode, decode, PyJWTError
 from datetime import datetime, timedelta
-from passlib.context import CryptContext
+
 from app.env import get_env
+from app.database import SessionLocal
+from app.models import User
+from app.schemas import CreateLoginSchema, JwtTokenSchema, UserSchema
+
+from passlib.context import CryptContext
 
 router = APIRouter()
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
