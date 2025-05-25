@@ -16,9 +16,8 @@ def test_create_message(client, user_token):
     message_id = resp.json()["id"]
 
 def test_get_all_messages(client, user_token):
-    # GIVEN 已登入的使用者
-    # WHEN 查詢所有留言
-    resp = client.get("/messages", headers=auth_header(user_token))
+    # WHEN 查詢所有留言（不需登入）
+    resp = client.get("/messages")
     # THEN 應取得留言列表
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
@@ -28,8 +27,8 @@ def test_get_message(client, user_token):
     data = CreateMessageSchema(message="get single").dict()
     resp = client.post("/message", json=data, headers=auth_header(user_token))
     msg_id = resp.json()["id"]
-    # WHEN 查詢該留言
-    resp = client.get(f"/message/{msg_id}", headers=auth_header(user_token))
+    # WHEN 查詢該留言（不需登入）
+    resp = client.get(f"/message/{msg_id}")
     # THEN 應取得該留言內容
     assert resp.status_code == 200
     assert resp.json()["id"] == msg_id

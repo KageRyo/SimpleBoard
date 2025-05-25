@@ -17,7 +17,7 @@ class Message(Base):
     __tablename__ = "messages" # 資料表名稱
     
     id = Column(Integer, primary_key=True, index=True) # 主鍵
-    username = Column(String, ForeignKey("users.username"))
+    username = Column(String, ForeignKey("users.username"), nullable=False)
     message = Column(String) # 留言訊息
     
     author = relationship("User", back_populates="messages") # 一對多的關聯，留言者是使用者

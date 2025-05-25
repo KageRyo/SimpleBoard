@@ -7,8 +7,19 @@ from app.schemas import CreateLoginSchema
 TEST_USERNAME = os.environ.get("TEST_USER", "testuser")
 TEST_PASSWORD = os.environ.get("TEST_PASS", "testpass")
 
-@pytest.mark.skip(reason="Skipping registration test temporarily")
+def delete_test_user(client):
+    # 登入取得 access token
+    payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
+    resp = client.post("/login", json=payload)
+    if resp.status_code != 200:
+        return
+    access_token = resp.json()["access"]
+    # 刪除帳號
+    client.delete("/delete", headers={"Authorization": f"Bearer {access_token}"})
+
 def test_register(client):
+    # 測試前先刪除帳號，確保乾淨
+    delete_test_user(client)
     # GIVEN 尚未註冊的帳號
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
     # WHEN 註冊新帳號
@@ -16,18 +27,19 @@ def test_register(client):
     # THEN 應註冊成功
     assert resp.status_code == 200
     assert resp.json()["username"] == TEST_USERNAME
-
-def test_register_duplicate(client):
     # GIVEN 已存在的帳號
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
     # WHEN 再次註冊相同帳號
     resp = client.post("/register", json=payload)
     # THEN 應回傳 400
     assert resp.status_code == 400
+    # 測試後刪除帳號
+    delete_test_user(client)
 
 def test_login_success(client):
-    # GIVEN 已註冊的帳號
+    # 確保帳號存在
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
+    client.post("/register", json=payload)
     # WHEN 正確登入
     resp = client.post("/login", json=payload)
     # THEN 應取得 access 與 refresh token
@@ -44,9 +56,11 @@ def test_login_fail(client):
     assert resp.status_code == 401
 
 def test_refresh_token(client):
-    # GIVEN 已取得 refresh token
+    # 確保帳號存在
     payload = CreateLoginSchema(username=TEST_USERNAME, password=TEST_PASSWORD).dict()
+    client.post("/register", json=payload)
     resp = client.post("/login", json=payload)
+    assert resp.status_code == 200
     refresh_token = resp.json()["refresh"]
     # WHEN 使用 refresh token 取得新 token
     resp = client.post("/refresh", params={"refresh": refresh_token})
