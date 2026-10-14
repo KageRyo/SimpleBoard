@@ -22,7 +22,7 @@ A simple message board built with FastAPI.
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-username/SimpleBoard.git
+   git clone https://github.com/KageRyo/SimpleBoard.git
    cd SimpleBoard
    ```
 
